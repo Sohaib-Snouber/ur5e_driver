@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>ur5e_driver</name>
+  <version>0.0.0</version>
+  <description>this package will set up the planning scene then it will plan a series of tasks using Moveit
+  Task Constructor (MTC) and then the these task will be saved to be send to the action server, and the
+  action client will ask the server to execute some specific stages or full tasks</description>
+  <maintainer email="sohaibshehabsnouber@gmail.com">sohaib</maintainer>
+  <license>Apache license 2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>rclcpp</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  
+  <depend>master_project_msgs</depend>
+  <depend>moveit_core</depend>
+  <depend>moveit_ros_planning_interface</depend>
+  <depend>moveit_task_constructor_core</depend>
+  <depend>moveit_visual_tools</depend>
+  <depend>ur_rtde</depend>
+  <depend>rclcpp_action</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
