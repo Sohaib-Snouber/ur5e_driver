@@ -14,6 +14,8 @@
 #include <cmath> // For M_PI
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Vector3.h>
+#include <moveit_msgs/msg/constraints.hpp>
+#include <moveit_msgs/msg/orientation_constraint.hpp>
 
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("execution_task");
@@ -117,6 +119,7 @@ void TaskExecutionNode::createAndPublishTask()
   task_.setProperty("ik_frame", hand_frame);
 
   auto sampling_planner = std::make_shared<mtc::solvers::PipelinePlanner>(shared_from_this());
+
   auto cartesian_planner = std::make_shared<mtc::solvers::CartesianPath>();
   cartesian_planner->setMaxVelocityScalingFactor(1.0);
   cartesian_planner->setMaxAccelerationScalingFactor(1.0);
@@ -126,16 +129,35 @@ void TaskExecutionNode::createAndPublishTask()
   auto stage_state_current = std::make_unique<mtc::stages::CurrentState>("current");
   task_.add(std::move(stage_state_current));
 
+    // Close hand
+  auto stage_close_hand = std::make_unique<mtc::stages::MoveTo>("close hand", sampling_planner);
+  stage_close_hand->setGroup(hand_group_name);
+  stage_close_hand->setGoal("close");
+  task_.add(std::move(stage_close_hand));
+  
   // Subtract 10 cm (0.1 meters)
   double distanceToSubtract = 0.1; // 10 cm
   geometry_msgs::msg::PoseStamped message_pose = current_target_pose_;
   geometry_msgs::msg::PoseStamped target_pose = subtractDistance(message_pose, distanceToSubtract);
 
-  // not_full_open hand
+  // Define orientation constraint
+  moveit_msgs::msg::OrientationConstraint ocm;
+  ocm.link_name = hand_frame;
+  ocm.header.frame_id = "world";
+  ocm.orientation = target_pose.pose.orientation; // Set the desired orientation
+  ocm.absolute_x_axis_tolerance = 0.1; // Allowable deviation in x-axis (roll)
+  ocm.absolute_y_axis_tolerance = 0.1; // Allowable deviation in y-axis (pitch)
+  ocm.absolute_z_axis_tolerance = 0.1; // Allowable deviation in z-axis (yaw)
+  ocm.weight = 1.0;
+
+  moveit_msgs::msg::Constraints path_constraints;
+  path_constraints.orientation_constraints.push_back(ocm);
+
+/*   // not_full_open hand
   auto stage_not_full_open_hand = std::make_unique<mtc::stages::MoveTo>("not full open hand", sampling_planner);
   stage_not_full_open_hand->setGroup(hand_group_name);
   stage_not_full_open_hand->setGoal("not_full_open");
-  task_.add(std::move(stage_not_full_open_hand));
+  task_.add(std::move(stage_not_full_open_hand)); */
 
   // Move to target pose
   auto move_to_target = std::make_unique<mtc::stages::MoveTo>("move to target", sampling_planner);
@@ -143,7 +165,7 @@ void TaskExecutionNode::createAndPublishTask()
   move_to_target->setGoal(target_pose);
   task_.add(std::move(move_to_target));
 
-  // Define the slide pose
+/*   // Define the slide pose
   geometry_msgs::msg::PoseStamped slide_pose = current_target_pose_;
 
   // Move to slide pose
@@ -152,19 +174,7 @@ void TaskExecutionNode::createAndPublishTask()
   move_to_slide->setGoal(slide_pose);
   task_.add(std::move(move_to_slide));
 
-  /* // Allow collision (hand, target1) temporarily
-  auto allow_collision_target1 = std::make_unique<mtc::stages::ModifyPlanningScene>("allow collision (hand, target1)");
-  allow_collision_target1->allowCollisions("target1",
-                                            task_.getRobotModel()
-                                                ->getJointModelGroup(hand_group_name)
-                                                ->getLinkModelNamesWithCollisionGeometry(),
-                                            true);
-  task_.add(std::move(allow_collision_target1));
 
-  // Allow collision (target1, table1) temporarily
-  auto allow_collision_target1_table1 = std::make_unique<mtc::stages::ModifyPlanningScene>("allow collision (target1, table1)");
-  allow_collision_target1_table1->allowCollisions("target1", {"table1"}, true);
-  task_.add(std::move(allow_collision_target1_table1)); */
 
   // Close hand
   auto stage_close_hand = std::make_unique<mtc::stages::MoveTo>("close hand", sampling_planner);
@@ -172,31 +182,15 @@ void TaskExecutionNode::createAndPublishTask()
   stage_close_hand->setGoal("close");
   task_.add(std::move(stage_close_hand));
 
-  /* // Attach target1 to the gripper
-  auto attach_target1 = std::make_unique<mtc::stages::ModifyPlanningScene>("attach target1");
-  attach_target1->attachObject("target1", hand_frame);
-  task_.add(std::move(attach_target1));
- */
-  // Lift target1 slightly to avoid collision with the table
-  auto lift_target1 = std::make_unique<mtc::stages::MoveRelative>("lift target1", cartesian_planner);
-  lift_target1->properties().set("marker_ns", "lift_target1");
-  lift_target1->properties().set("link", hand_frame);
-  lift_target1->properties().configureInitFrom(mtc::Stage::PARENT, { "group" });
-  lift_target1->setMinMaxDistance(0.1, 0.15); // Increase lift height
 
-  // Set lift direction
-  geometry_msgs::msg::Vector3Stamped lift_direction;
-  lift_direction.header.frame_id = "world";
-  lift_direction.vector.x = -message_pose.pose.orientation.x; // Lift as same as target orientation
-  lift_direction.vector.y = -message_pose.pose.orientation.y;
-  lift_direction.vector.z = -message_pose.pose.orientation.z;
-  lift_target1->setDirection(lift_direction);
-  task_.add(std::move(lift_target1));
+  geometry_msgs::msg::PoseStamped slide2_pose = target_pose;
 
- /*  // Re-enable collision (target1, table1) after lifting
-  auto reenable_collision_target1_table1 = std::make_unique<mtc::stages::ModifyPlanningScene>("reenable collision (target1, table1)");
-  reenable_collision_target1_table1->allowCollisions("target1", {"table1"}, false);
-  task_.add(std::move(reenable_collision_target1_table1)); */
+  // Move to slide pose
+  auto move_to_slide2 = std::make_unique<mtc::stages::MoveTo>("move to slide2", cartesian_planner);
+  move_to_slide2->setGroup(arm_group_name);
+  move_to_slide2->setGoal(slide2_pose);
+  task_.add(std::move(move_to_slide2));
+
 
   // Define the slide pose
   auto const position_pose = [message_pose]{
@@ -220,7 +214,7 @@ void TaskExecutionNode::createAndPublishTask()
   auto stage_open2_hand = std::make_unique<mtc::stages::MoveTo>("open hand", sampling_planner);
   stage_open2_hand->setGroup(hand_group_name);
   stage_open2_hand->setGoal("not_full_open");
-  task_.add(std::move(stage_open2_hand));
+  task_.add(std::move(stage_open2_hand)); */
 
   // Initialize the task and publish task details
   try
@@ -234,7 +228,7 @@ void TaskExecutionNode::createAndPublishTask()
   }
 
   // Plan the task
-  if (!task_.plan(20))
+  if (!task_.plan(100))
   {
     RCLCPP_ERROR(this->get_logger(), "Task planning failed");
     return;

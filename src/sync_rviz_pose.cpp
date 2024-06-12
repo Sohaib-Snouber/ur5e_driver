@@ -15,7 +15,7 @@ using namespace std::chrono_literals;
 
 class URRTDENode : public rclcpp::Node {
 public:
-    URRTDENode() : Node("ur_rtde_node"), ip_("10.130.1.100") {
+    URRTDENode() : Node("ur_rtde_node"), ip_("10.130.1.100"), success_(false) {
         this->declare_parameter<std::string>("robot_ip", ip_);
         this->get_parameter("robot_ip", ip_);
 
@@ -85,13 +85,16 @@ private:
             return;
         }
 
-        // Shutdown once the process is complete
-        rclcpp::shutdown();
+        // Check if the process completed successfully
+        if (success_) {
+            rclcpp::shutdown();
+        }
     }
 
     double get_gripper_position() {
         auto gripper_status = gripper_->getCurrentPosition();
         double position = gripper_status; // Normalize position between 0 and 1
+        RCLCPP_INFO(this->get_logger(), "Real Gripper Position: %f", position);
         return position;
     }
     double map_value(double value, double fromLow, double fromHigh, double toLow, double toHigh) {
@@ -99,9 +102,11 @@ private:
     }
 
     double map_gripper_to_finger_joint(double gripper_position) {
-        double close_finger_joint = 0.69991196175;
-        double open_finger_joint = 0.07397215645645;
-        return map_value(gripper_position, 0.988235, 0.105882, open_finger_joint, close_finger_joint);
+        double close_finger_joint = 0.7; //0.69991196175
+        double open_finger_joint = 0.0; //0.07397215645645
+        double mapped_position = map_value(gripper_position, 1, 0, open_finger_joint, close_finger_joint); // 0.988235, 0.105882
+        RCLCPP_INFO(this->get_logger(), "Mapped Finger Joint Position: %f", mapped_position);
+        return mapped_position;
     }
 
     void plan_and_visualize_trajectory(const std::vector<double>& joint_positions) {
@@ -134,8 +139,10 @@ private:
         if (arm_success) {
             RCLCPP_INFO(this->get_logger(), "Planning successful. Executing the plan.");
             arm_move_group_interface.execute(arm_plan);
+            success_ = true;  // Set the success flag if planning and execution succeed
         } else {
             RCLCPP_ERROR(this->get_logger(), "Planning failed!");
+            success_ = false;  // Reset the success flag if planning fails
         }
     }
 
@@ -153,6 +160,12 @@ private:
         RCLCPP_INFO(this->get_logger(), "RViz Gripper Position: %f", gripper_joint_positions[0]);
         kinematic_state->setJointGroupPositions(gripper_joint_model_group, gripper_joint_positions);
 
+        // Validate initial state
+        if (!kinematic_state->satisfiesBounds()) {
+            RCLCPP_ERROR(this->get_logger(), "Initial state is out of bounds");
+            return;
+        }
+
         // Create MoveGroupInterface for the gripper
         moveit::planning_interface::MoveGroupInterface gripper_move_group_interface(shared_from_this(), "gripper");
 
@@ -166,8 +179,10 @@ private:
         if (gripper_success) {
             RCLCPP_INFO(this->get_logger(), "Planning successful. Executing the plan.");
             gripper_move_group_interface.execute(gripper_plan);
+            success_ = true;  // Set the success flag if planning and execution succeed
         } else {
             RCLCPP_ERROR(this->get_logger(), "Planning failed!");
+            success_ = false;  // Reset the success flag if planning fails
         }
     }
 
@@ -176,6 +191,7 @@ private:
     std::unique_ptr<RobotiqGripper> gripper_;
     std::string ip_;
     rclcpp::TimerBase::SharedPtr timer_;
+    bool success_;
 
 };
 

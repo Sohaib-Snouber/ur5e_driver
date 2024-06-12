@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(ur5e_driver)
+project(master_ur5e_driver)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -37,12 +37,6 @@ ament_target_dependencies(task_action_server
   moveit_ros_planning_interface
 )
 
-add_executable(task_action_client src/task_action_client.cpp)
-ament_target_dependencies(task_action_client
- rclcpp 
- rclcpp_action
-  master_project_msgs
-)
 
 add_executable(planning_scene_node src/planning_scene_node.cpp)
 ament_target_dependencies(planning_scene_node
@@ -83,6 +77,12 @@ ament_target_dependencies(sync_rviz_pose
   moveit_core
   ur_rtde
 )
+add_executable(testing_server src/testing_server.cpp)
+ament_target_dependencies(testing_server
+ rclcpp 
+ rclcpp_action
+ master_project_msgs
+)
 
 install(TARGETS 
   sync_rviz_pose
@@ -90,7 +90,7 @@ install(TARGETS
   target_pose_node
   task_execution_node
   task_action_server
-  task_action_client
+  testing_server
   DESTINATION lib/${PROJECT_NAME})
 
 target_link_libraries(task_action_server

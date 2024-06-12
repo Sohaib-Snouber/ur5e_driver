@@ -1,11 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>ur5e_driver</name>
+  <name>master_ur5e_driver</name>
   <version>0.0.0</version>
-  <description>this package will set up the planning scene then it will plan a series of tasks using Moveit
-  Task Constructor (MTC) and then the these task will be saved to be send to the action server, and the
-  action client will ask the server to execute some specific stages or full tasks</description>
+  <description>this package will set up the planning scene then the client will ask server for planning and executing motion on rviz and real robot</description>
   <maintainer email="sohaibshehabsnouber@gmail.com">sohaib</maintainer>
   <license>Apache license 2.0</license>
 
